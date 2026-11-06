@@ -1,0 +1,49 @@
+# 參考用 compose 檔：單機執行 OMR 服務。
+# 服務金鑰不進 git：放在同目錄的環境檔（.env，權限只給擁有者）。
+services:
+  notes-omr:
+    image: notes-omr:${NOTES_OMR_TAG:-1}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: notes-omr
+    restart: unless-stopped
+    environment:
+      SERVICE_KEY: ${SERVICE_KEY:?SERVICE_KEY must be provided}
+      PORT: "8000"
+      MAX_UPLOAD_MB: "30"
+      MAX_PAGES: "10"
+      JOB_RETENTION_HOURS: "24" # 保留清理：啟動時與每小時刪除超過時數的作業檔案
+      OMR_ENGINE: homr
+      OMR_THREADS: "2"
+      OMR_CONCURRENCY: ${OMR_CONCURRENCY:-}
+      OMR_EST_SECONDS_PER_PAGE: "70"
+      # 雲端平行辨識（選用）：REMOTE_WORKER_URL 留空 = 完全停用（本機單頁序列）。
+      # 啟用時 OMR_CONCURRENCY 預設放寬到 8。WORKER_KEY 放環境檔。細節見 docs/CONTRACT.md 第 5 節。
+      WORKER_KEY: ${WORKER_KEY:-}
+      REMOTE_WORKER_URL: ${REMOTE_WORKER_URL:-}
+      REMOTE_MAX_PARALLEL: ${REMOTE_MAX_PARALLEL:-20}
+      REMOTE_TIMEOUT_S: ${REMOTE_TIMEOUT_S:-240}
+      # 每月免費額度保護（用到比例 x 免費額度就停用雲端、改本機）；規格要與 worker 部署的 CPU／記憶體一致
+      REMOTE_VCPU: ${REMOTE_VCPU:-2}
+      REMOTE_MEM_GIB: ${REMOTE_MEM_GIB:-2}
+      REMOTE_FREE_VCPU_SECONDS: ${REMOTE_FREE_VCPU_SECONDS:-180000}
+      REMOTE_FREE_GIB_SECONDS: ${REMOTE_FREE_GIB_SECONDS:-360000}
+      REMOTE_CAP_RATIO: ${REMOTE_CAP_RATIO:-0.8}
+      REMOTE_EST_PAGE_SECONDS: ${REMOTE_EST_PAGE_SECONDS:-60}
+    volumes:
+      - ./data:/data
+    mem_limit: 2g
+    memswap_limit: 2g
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    ports:
+      - "127.0.0.1:8000:8000" # 只綁本機；對外請放在你自己的反向代理後面
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }

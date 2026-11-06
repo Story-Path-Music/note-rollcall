@@ -1,0 +1,5 @@
+{
+  "default": "homr",
+  "homr": { "dpi": 150 },
+  "mock": { "dpi": 150 }
+}
